@@ -19,18 +19,30 @@
   
   <!-- Template for <l>: insert <seg/> markers -->
   <xsl:template match="tei:l">
-    <xsl:copy>
-      <xsl:apply-templates select="@*"/>
-      
-      <!-- Process children and insert segments -->
-      <xsl:call-template name="process-with-segments">
-        <xsl:with-param name="nodes" select="*"/>
-        <xsl:with-param name="position" select="1"/>
-        <xsl:with-param name="count" select="0"/>
-        <xsl:with-param name="seg-index" select="1"/>
-        <xsl:with-param name="pending-seg" select="false()"/>
-      </xsl:call-template>
-    </xsl:copy>
+    <xsl:variable name="result">
+      <xsl:copy>
+        <xsl:apply-templates select="@*"/>
+        
+        <!-- Process children and insert segments -->
+        <xsl:call-template name="process-with-segments">
+          <xsl:with-param name="nodes" select="*"/>
+          <xsl:with-param name="position" select="1"/>
+          <xsl:with-param name="count" select="0"/>
+          <xsl:with-param name="seg-index" select="1"/>
+          <xsl:with-param name="pending-seg" select="false()"/>
+        </xsl:call-template>
+      </xsl:copy>
+    </xsl:variable>
+    
+    <!-- Output the result -->
+    <xsl:copy-of select="$result"/>
+    
+    <!-- Check if last element (excluding bottom rdg) is seg -->
+    <xsl:variable name="last-non-rdg" select="$result/tei:l/*[not(local-name() = 'rdg' and @corresp)][last()]"/>
+    <xsl:if test="not(local-name($last-non-rdg) = 'seg')">
+      <xsl:comment> TODO: problematic waka, last element is not seg </xsl:comment>
+      <xsl:text>&#10;</xsl:text>
+    </xsl:if>
   </xsl:template>
   
   <!-- Recursive template to process nodes and insert segments -->
@@ -76,14 +88,14 @@
       <!-- Check if next non-skipped element has forbidden pos -->
       <xsl:variable name="next-forbidden" as="xs:boolean">
         <xsl:variable name="next-non-skipped" select="$nodes[position() > $position][not(@pos = 'Sym.g' or (local-name() = 'rdg' and not(parent::tei:app)))][1]"/>
-        <xsl:value-of select="exists($next-non-skipped) and ($next-non-skipped/@pos = 'P.c.g' or $next-non-skipped/@pos = 'Aux')"/>
+        <xsl:value-of select="exists($next-non-skipped) and ($next-non-skipped/@pos = 'P.c.g' or $next-non-skipped/@pos = 'P.bind' or $next-non-skipped/@pos = 'P.Conj' or $next-non-skipped/@pos = 'Aux')"/>
       </xsl:variable>
       
       <!-- Determine if we should insert seg after this element -->
       <xsl:variable name="should-insert-seg" as="xs:boolean">
         <xsl:choose>
           <!-- If we have a pending seg and current element is not forbidden pos -->
-          <xsl:when test="$pending-seg and not($should-skip) and not($current/@pos = 'P.c.g' or $current/@pos = 'Aux')">
+          <xsl:when test="$pending-seg and not($should-skip) and not($current/@pos = 'P.c.g' or $current/@pos = 'P.bind' or $current/@pos = 'P.Conj' or $current/@pos = 'Aux')">
             <xsl:value-of select="true()"/>
           </xsl:when>
           <!-- If we just reached threshold and next element is not forbidden -->
