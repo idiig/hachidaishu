@@ -88,14 +88,28 @@
       <!-- Check if next non-skipped element has forbidden pos -->
       <xsl:variable name="next-forbidden" as="xs:boolean">
         <xsl:variable name="next-non-skipped" select="$nodes[position() > $position][not(@pos = 'Sym.g' or (local-name() = 'rdg' and not(parent::tei:app)))][1]"/>
-        <xsl:value-of select="exists($next-non-skipped) and ($next-non-skipped/@pos = 'P.c.g' or $next-non-skipped/@pos = 'P.bind' or $next-non-skipped/@pos = 'P.Conj' or $next-non-skipped/@pos = 'Aux')"/>
+        <xsl:choose>
+          <xsl:when test="not(exists($next-non-skipped))">
+            <xsl:value-of select="false()"/>
+          </xsl:when>
+          <xsl:otherwise>
+            <xsl:call-template name="is-forbidden-pos">
+              <xsl:with-param name="node" select="$next-non-skipped"/>
+            </xsl:call-template>
+          </xsl:otherwise>
+        </xsl:choose>
       </xsl:variable>
       
       <!-- Determine if we should insert seg after this element -->
       <xsl:variable name="should-insert-seg" as="xs:boolean">
+        <xsl:variable name="current-is-forbidden" as="xs:boolean">
+          <xsl:call-template name="is-forbidden-pos">
+            <xsl:with-param name="node" select="$current"/>
+          </xsl:call-template>
+        </xsl:variable>
         <xsl:choose>
           <!-- If we have a pending seg and current element is not forbidden pos -->
-          <xsl:when test="$pending-seg and not($should-skip) and not($current/@pos = 'P.c.g' or $current/@pos = 'P.bind' or $current/@pos = 'P.Conj' or $current/@pos = 'Aux')">
+          <xsl:when test="$pending-seg and not($should-skip) and not($current-is-forbidden)">
             <xsl:value-of select="true()"/>
           </xsl:when>
           <!-- If we just reached threshold and next element is not forbidden -->
@@ -201,6 +215,31 @@
         </xsl:otherwise>
       </xsl:choose>
     </xsl:if>
+  </xsl:template>
+  
+  <!-- Check if an element has forbidden pos for seg insertion -->
+  <xsl:template name="is-forbidden-pos">
+    <xsl:param name="node"/>
+    
+    <xsl:variable name="pos" select="$node/@pos"/>
+    <xsl:choose>
+      <!-- P.c.g, P.bind, P.Conj, P.fin are always forbidden -->
+      <xsl:when test="$pos = 'P.c.g' or $pos = 'P.bind' or $pos = 'P.Conj' or $pos = 'P.fin'">
+        <xsl:value-of select="true()"/>
+      </xsl:when>
+      <!-- Aux is forbidden except when KanjiReading is なる or なり -->
+      <xsl:when test="$pos = 'Aux'">
+        <xsl:variable name="kanji-reading">
+          <xsl:call-template name="extract-kanji-reading">
+            <xsl:with-param name="msd" select="$node/@msd"/>
+          </xsl:call-template>
+        </xsl:variable>
+        <xsl:value-of select="$kanji-reading != 'なる' and $kanji-reading != 'なり'"/>
+      </xsl:when>
+      <xsl:otherwise>
+        <xsl:value-of select="false()"/>
+      </xsl:otherwise>
+    </xsl:choose>
   </xsl:template>
   
 </xsl:stylesheet>
